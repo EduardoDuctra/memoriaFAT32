@@ -1,0 +1,251 @@
+program Algoritmo_1;
+	VAR vez: char; 
+
+PROCEDURE Processo_A;
+BEGIN
+	REPEAT
+		WHILE(Vez = 'B') DO (*não faz nada*);
+		Regiao_Critica_A;
+		Vez:= "B";
+		Processamento_A; 
+	UNTIL false;
+END
+
+
+PROCEDURE Processo_B;
+BEGIN
+	REPEAT
+		WHILE(Vez = 'A') DO (*não faz nada*);
+		Regiao_Critica_B;
+		Vez:= "A";
+		Processamento_B; 
+	UNTIL false;
+END
+
+BEGIN
+	Vez:= 'A';
+	PARBEGIN
+		Processo_A;
+		Processo_B;
+	PAREND;
+
+END
+
+_____________________________________________________
+
+program Algoritmo_3;
+	VAR CA, CB: boolean; 
+
+PROCEDURE Processo_A;
+BEGIN
+	REPEAT
+		CA:= true;
+		WHILE(CB) DO (*não faz nadaa*);
+		Regiao_Critica_A;
+		CA:= false;
+		Processamento_A; 
+	UNTIL false;
+END
+
+
+PROCEDURE Processo_B;
+BEGIN
+	REPEAT
+		CB:= true;
+		WHILE(CA) DO (*não faz nada*);
+		Regiao_Critica_B;
+		CB:= false;
+		Processamento_B; 
+	UNTIL false;
+END
+
+BEGIN
+	CA:= false; 
+	CB:= false; 
+
+	PARBEGIN
+		Processo_A;
+		Processo_B;
+	PAREND;
+
+END
+
+a diferença do primeiro é que cada um tem uma vez certa, pq estou usando variaveis. No segundo, também, ninguem entra na vez de ninguem. Nesse uso boolean. E Pode ocorrer de o segundo nunca entrar, se o primeiro nao terminar.
+
+Sobre o 3: Se ambos os processos entram em execução ao mesmo tempo e alteram suas variáveis de controle simultaneamente, ou seja, ambos definem CA := true e CB := true ao mesmo tempo, nenhum dos processos conseguirá entrar na região crítica
+
+_____________________________________________________
+
+program Algoritmo_4;
+	VAR CA, CB: boolean; 
+
+PROCEDURE Processo_A;
+BEGIN
+	REPEAT
+		CA:= false;
+		WHILE(CB) DO (*não faz nadaa*);
+		BEGIN
+		{pequeno intervalo de tempo}
+		CA:= true;
+		END
+		Regiao_Critica_A;
+		CA:= false;
+	UNTIL false;
+END
+
+
+PROCEDURE Processo_B;
+BEGIN
+	REPEAT
+		CB:= false;
+		WHILE(CA) DO (*não faz nadaa*);
+		BEGIN
+		{pequeno intervalo de tempo}
+		CB:= true;
+		END
+		Regiao_Critica_A;
+		CB:= false;
+	UNTIL false;
+ENDUNTIL false;
+END
+
+BEGIN
+	CA:= false; 
+	CB:= false; 
+
+	PARBEGIN
+		Processo_A;
+		Processo_B;
+	PAREND;
+
+END
+
+igual ao 3
+
+
+_____________________________________________________
+
+program Algoritmo_Peterson;
+    VAR CA, CB: boolean;
+    Vez: CHAR;
+
+PROCEDURE Processo_A;
+BEGIN
+    REPEAT
+        CA := true;       (* Processo A se declara interessado em entrar *)
+        Vez := 'B';       (* A vez é de B, permitindo que A aguarde *)
+        WHILE (CB and Vez = 'B') DO (* Processo A espera enquanto B está interessado ou a vez é de B *)
+        BEGIN
+            (* Não faz nada, apenas espera *)
+        END;
+        Regiao_Critica_A;  (* Processo A entra na região crítica *)
+        CA := false;       (* Processo A libera sua variável de controle *)
+        Processamento_A;   (* Processo A realiza o processamento *)
+    UNTIL false;
+END
+
+PROCEDURE Processo_B;
+BEGIN
+    REPEAT
+        CB := true;       (* Processo B se declara interessado em entrar *)
+        Vez := 'A';       (* A vez é de A, permitindo que B aguarde *)
+        WHILE (CA and Vez = 'A') DO (* Processo B espera enquanto A está interessado ou a vez é de A *)
+        BEGIN
+            (* Não faz nada, apenas espera *)
+        END;
+        Regiao_Critica_B;  (* Processo B entra na região crítica *)
+        CB := false;       (* Processo B libera sua variável de controle *)
+        Processamento_B;   (* Processo B realiza o processamento *)
+    UNTIL false;
+END
+
+BEGIN
+    CA := false;  (* Inicialização das variáveis de controle *)
+    CB := false;
+    Vez := 'A';   (* Inicialmente, a vez é de A *)
+
+    PARBEGIN
+        Processo_A;
+        Processo_B;
+    PAREND;
+END
+
+é isso aqui que garante a exclusão mutua:  WHILE (CA and Vez = 'A');
+evita tanto starvation quanto deadlock;
+
+
+_____________________________________________________
+
+program semaforo_1
+	VAR s: Semaforo = 1;
+
+Procedure Processo_A:
+BEGIN
+	REPEAT
+		DOWN(s);
+		 Regiao_Critica_A;
+		UP(s);
+		UNTIL False;
+END
+
+Procedure Processo_B
+BEGIN
+	REPEAT
+		DOWN(s);
+		 Regiao_Critica_B;
+		UP(s);
+		UNTIL False;
+END
+
+    PARBEGIN
+        Processo_A;
+        Processo_B;
+    PAREND;
+END
+
+
+_____________________________________________________
+
+program Produtor_Consumidor
+	CONST TamnBuf = 2;
+	TYPE Tipo_Dado = (tipo qualquer);
+	VAR Vazio: Semaforo = TamnBuf;
+	VAR Cheio: Semaforo = 0;
+	VAR Mutex: Semaforo = 1;
+	VAR Buffer: Array [1...TamnBuf] of Tipo_Dado;
+	Dado_1: Tipo_Dado;
+	Dado_2: Tipo_Dado;
+Procedure Produtor:
+BEGIN
+	REPEAT
+		DOWN(Vazio);
+		DOWN(Mutex);
+		Grava_Buffer (Dado_1, Buffer);
+		UP(Mutex);
+		UP(Cheio);
+		UNTIL False;
+END
+
+Procedure Consumidor:
+BEGIN
+	REPEAT
+		DOWN(Cheio);
+		DOWN(Mutex);
+		Le_Buffer (Dado_2, Buffer);
+		UP(Mutex);
+		UP(Vazio);
+		Consome_Dado (Dado_2);
+		UNTIL False;
+END
+
+
+    PARBEGIN
+       Produtor
+        Consumidor;
+    PAREND;
+END
+
+_______________________
+se uma thread tiver na regiao critica, o syncronized impede outra de entrar
+wait: entra em espera para que outras threads do bloco syncronized entrem na regiao critica
+o notify acorda uma thread que esta dormindo
