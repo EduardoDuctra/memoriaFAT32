@@ -12,7 +12,15 @@ public class Main {
         try {
             disco.init();
             Fat32 fat32 = new Fat32(disco);
-            carregarArquivo(fat32);
+
+
+            String caminhoLocal = "src/main/resources/arquivos/trabalho.pdf";
+
+            String caminhoLocal_2 = "src/main/resources/arquivos/Algoritmos_Prova01.txt";
+
+            carregarArquivo(fat32,caminhoLocal, "PDFimport");
+            carregarArquivo(fat32,caminhoLocal_2, "TXTimport");
+
             menu(fat32);
         } catch (IOException e) {
             System.err.println("Erro ao inicializar: " + e.getMessage());
@@ -31,7 +39,8 @@ public class Main {
             System.out.println("4. Adicionar conteúdo");
             System.out.println("5. Excluir arquivo");
             System.out.println("6. Mostrar uso da memória");
-            System.out.println("7. Sair");
+            System.out.println("7. Exportar arquivo");
+            System.out.println("8. Sair");
             System.out.print("Opção: ");
 
             opcao = sc.nextInt();
@@ -58,14 +67,20 @@ public class Main {
                     break;
 
                 case 7:
+                    exportarArquivo(fat32, sc);
+                    break;
+
+                case 8:
                     System.out.println("Encerrando sistema...");
                     break;
+
                 default:
                     System.out.println("Opção inválida!");
             }
-        } while (opcao != 7);
+        } while (opcao != 8);
         sc.close();
     }
+
 
     private static void criarArquivo(Fat32 fat32, Scanner sc) throws IOException {
 
@@ -170,13 +185,11 @@ public class Main {
         }
     }
 
-    private static void carregarArquivo(Fat32 fat32) throws IOException {
+    private static void carregarArquivo(Fat32 fat32, String caminhoLocal, String nomeFAT32) throws IOException {
 
 
             System.out.println("\n--- Carregar Arquivo para FAT32 ---");
 
-            // Caminho do arquivo no PC
-            String caminhoLocal = "E:\\UFSM\\2025_1\\SO\\Trabalho\\fat32\\src\\main\\resources\\arquivos\\Algoritmos_Prova01.txt";
 
             File arquivoLocal = new File(caminhoLocal);
 
@@ -184,9 +197,6 @@ public class Main {
                 System.out.println("Arquivo não encontrado.");
                 return;
             }
-
-            // Nome do arquivo no FAT32
-            String nomeFAT32 = "Arquivo01.txt";
 
             try{
 
@@ -217,5 +227,32 @@ public class Main {
         System.out.println("Memória Total:     " + totalKB + " KB");
         System.out.println("Memória Ocupada:   " + usadoKB + " KB");
         System.out.println("Memória Disponível:" + livreKB + " KB");
+    }
+
+
+
+    private static void exportarArquivo(Fat32 fat32, Scanner sc) throws IOException {
+        System.out.println("\n--- Exportar Arquivo ---");
+
+        int indice = selecionarArquivo(fat32, sc, "exportação");
+
+        if (indice >= 0) {
+            String nomeArquivo = fat32.listarArquivos().get(indice);
+
+            // Lê todo o conteúdo do arquivo
+            byte[] conteudo = fat32.read(nomeArquivo, 0, -1);
+
+
+            String caminhoDestino = "E:\\UFSM\\2025_1\\SO\\Trabalho\\fat32\\src\\main\\resources\\arquivos\\pdfExport.pdf";
+
+            File destino = new File(caminhoDestino);
+
+            try {
+                Files.write(destino.toPath(), conteudo);
+                System.out.println("Arquivo exportado com sucesso para: " + caminhoDestino);
+            } catch (IOException e) {
+                System.err.println("Erro ao exportar arquivo: " + e.getMessage());
+            }
+        }
     }
 }
