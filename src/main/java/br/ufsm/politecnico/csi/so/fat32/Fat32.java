@@ -8,12 +8,15 @@ import java.util.Arrays;
 import java.util.List;
 
 public class Fat32 implements FileSystem {
-    // Constantes do sistema de arquivos
+
     private static final int TAM_BLOCO = 64 * 1024;  // 64KB por bloco
     private static final int NUM_BLOCO = 1024;       // Número total de blocos
     private static final int DIRETORIO_BLOCO = 0;    // Bloco reservado para diretório.o bloco de índice 0 será usado exclusivamente para guardar informações dos arquivos e pastas do diretório principal
     private static final int TAM_ENTRADA_DIRETORIO = 19; // 11 (nome) + 4 (tamanho do arquivo)/32bits + 4 (bloco inicial)/32bits
-    private static final int NUMERO_MAXIMO_ENTRADAS = TAM_BLOCO / TAM_ENTRADA_DIRETORIO;//capacidade máxima de arquivos no diretório
+
+    //capacidade máxima de arquivos no diretório. Pega o tamanho do bloco e divide pelo n de entradas disponiveis.
+    //serve para ver se ainda tenho memoria para alocar o arquivo x
+    private static final int NUMERO_MAXIMO_ENTRADAS = TAM_BLOCO / TAM_ENTRADA_DIRETORIO;
 
     // Componentes do sistema
     private final Disco disco;
@@ -28,11 +31,11 @@ public class Fat32 implements FileSystem {
 
     private void inicializarSistema() throws IOException {
 
+        //le os dados de um bloco especifico? o diretório
         byte[] blocoDir = disco.read(DIRETORIO_BLOCO);
         if (blocoDir[0] == 0) {
             formatarDisco();
         } else {
-
             carregarFat();
         }
         this.inicializado = true;
@@ -45,19 +48,27 @@ public class Fat32 implements FileSystem {
 
     private void formatarDisco() throws IOException {
 
+        //se o diretorio for vazio, crio um novo diretorio com o tamanho do bloco. 64KB
         byte[] dirVazio = new byte[TAM_BLOCO];
+
         disco.write(DIRETORIO_BLOCO, dirVazio);
 
 
+        //preenche todas as posições com 0 - FAT livre.
+        //Preencher os blocos da FAT como vazios
         Arrays.fill(fat, 0);
+
+        //dizer que o bloco que armazena a FAT é ocupado (-1)
         fat[DIRETORIO_BLOCO] = -1;
 
 
+        //Calculo quantos blocos vão ser necessários para armazenar a FAT. Coloco como -1 os blocos ocupados pela FAT
         int blocosFAT = (NUM_BLOCO * 4 + TAM_BLOCO - 1) / TAM_BLOCO;
 
         for (int i = 1; i <= blocosFAT; i++) {
             fat[i] = -1;
         }
+
 
         gravarFat();
 
@@ -71,19 +82,24 @@ public class Fat32 implements FileSystem {
 
     private void carregarFat() throws IOException {
 
-
         int blocoFat = 1;
-
 
         int offset = 0;
 
+        // Percorre todas as entradas da FAT, distribuídas pelos blocos. LE a FAT
         for (int i = 0; i < NUM_BLOCO; i++) {
+            // Verifica se o offset atingiu o tamanho do bloco
             if (offset >= TAM_BLOCO) {
+                // Se o bloco foi completamente lido, passa para o próximo bloco
                 blocoFat++;
+                // Reseta o offset para o próximo bloco
                 offset = 0;
             }
 
+            //LE o bloco da FAt e retorna um array com essas informações
             byte[] bloco = disco.read(blocoFat);
+
+            //Esta linha pega os dados do bloco lido e os converte em um valor inteiro (4 bytes). A FAT armazena 4bytes/32bits
             fat[i] = ByteBuffer.wrap(bloco, offset, 4).getInt();
             offset += 4;
         }
@@ -103,12 +119,14 @@ public class Fat32 implements FileSystem {
         if (!inicializado) throw new IOException("Sistema não inicializado");
         if (data == null) throw new IllegalArgumentException("Dados não podem ser nulos");
 
+        //chamo a função de formatar nome
         String nomeFormatado = formatarNomeArquivo(fileName);
         if (buscarEntradaDiretorio(nomeFormatado) != null) {
             throw new IOException("Arquivo já existe: " + nomeFormatado);
         }
 
-
+        //crio um inteiro com a quantidade de blocos que preciso
+        //data.length me da o tamanho do arquivo que veio pelo byte [] data por parâmetro no método
         int blocosNecessarios = (data.length + TAM_BLOCO - 1) / TAM_BLOCO;
 
 
@@ -116,14 +134,17 @@ public class Fat32 implements FileSystem {
             throw new IOException("Espaço insuficiente no disco");
         }
 
-        //Aloca os blocos, grava os dados e atualiza estruturas
-        //alocarBlocos(): pega blocos livres e atualiza a FAT
-        //gravarDados(): escreve os dados nos blocos alocados.
-        //adicionarEntradaDiretorio(): adiciona o arquivo ao diretório.
-        //gravarFat(): salva a FAT atualizada no disco.
+
+        //crio um arraay com a quantidade de blocos necessarios
         int[] blocos = alocarBlocos(blocosNecessarios);
+
+        //gravarDados(): escreve os dados nos blocos alocados.
         gravarDados(data, blocos);
+
+        //adicionarEntradaDiretorio(): adiciona o arquivo ao diretório.
         adicionarEntradaDiretorio(nomeFormatado, data.length, blocos[0]);
+
+        //gravarFat(): salva a FAT atualizada no disco.
         gravarFat();
 
         //1. vai fazer uma verificação se o disco foi inicializado e se os dados não sao null;
@@ -140,19 +161,25 @@ public class Fat32 implements FileSystem {
     @Override
     public void append(String fileName, byte[] data) throws IOException {
         if (!inicializado) throw new IOException("Sistema não inicializado");
+        //verifica se os dados que vieram por parametro não são null
         if (data == null || data.length == 0) return;
 
-
+        //busca o arquivo no diretorio pelo nome. Passa para o metodo buscarEntradaDiretorio
         EntradaDiretorio entrada = buscarEntradaDiretorio(fileName);
         if (entrada == null) {
             throw new IOException("Arquivo não encontrado: " + fileName);
         }
 
+        //calcula o espaço necessário para os dados adicionados
         int blocosNecessarios = (data.length + TAM_BLOCO - 1) / TAM_BLOCO;
+
+        //verifica se tem espaço no disco
         if (blocosNecessarios > freeSpace()) {
             throw new IOException("Espaço insuficiente para adicionar dados");
         }
 
+        //percorre do primeiro (getStarterBlock) até o ultimo bloco.
+        //Ocupados são 1 e livre 0
         int ultimoBloco = entrada.getStarterBlock();
         while (fat[ultimoBloco] > 0) {
             ultimoBloco = fat[ultimoBloco];
@@ -163,16 +190,25 @@ public class Fat32 implements FileSystem {
         int espacoLivre = TAM_BLOCO - (entrada.getFileSize() % TAM_BLOCO);
         int offset = 0;
 
+        //se tiver espaço livre no ultimo bloco, preenche
         if (espacoLivre > 0 && espacoLivre < TAM_BLOCO) {
+
+            //le os dados do ultimo bloco do arquivo e coloca num array do tipo byte
+            //aproveitamento do espaço livre
             byte[] blocoExistente = disco.read(ultimoBloco);
             int bytesParaEscrever = Math.min(espacoLivre, data.length);
 
+            //copia parte dos dados para o espaço livre no ultimo bloco
             System.arraycopy(data, 0, blocoExistente, TAM_BLOCO - espacoLivre, bytesParaEscrever);
+
+            //salva o ultimo bloco no disco
             disco.write(ultimoBloco, blocoExistente);
 
+            //salva o restante do conteudo para ser salvo nos próximos blocos
             offset += bytesParaEscrever;
         }
 
+        //Caso não caibam no ultimo bloco e precise de mais blocos
         // Aloca novos blocos se necessário e grava os dados restantes
         //Se houver dados adicionais para gravar, aloca mais blocos e liga-os ao último bloco
         if (offset < data.length) {
@@ -199,8 +235,10 @@ public class Fat32 implements FileSystem {
 
     @Override
     public byte[] read(String fileName, int offset, int limit) throws IOException {
+        //manda por parametro o nome, posição inicial do bloco, e a quantidade de bytes a ler
         if (!inicializado) throw new IOException("Sistema não inicializado");
 
+        //buscar o arquivo no diretorio
         EntradaDiretorio entrada = buscarEntradaDiretorio(fileName);
         if (entrada == null) {
             throw new IOException("Arquivo não encontrado: " + fileName);
@@ -255,11 +293,14 @@ public class Fat32 implements FileSystem {
     public void remove(String fileName) throws IOException {
         if (!inicializado) throw new IOException("Sistema não inicializado");
 
+        //buscar o arquivo no diretorio
         EntradaDiretorio entrada = buscarEntradaDiretorio(fileName);
         if (entrada == null) {
             throw new IOException("Arquivo não encontrado: " + fileName);
         }
 
+        //pego o primeiro bloco do arquivo e percorro até o bloco não ser 0. Estão ocupados (1).
+        //Vou marcando os blocos com 0 (livre)
         int blocoAtual = entrada.getStarterBlock();
         while (blocoAtual > 0) {
             int proximoBloco = fat[blocoAtual];
@@ -278,7 +319,10 @@ public class Fat32 implements FileSystem {
 
     @Override
     public int freeSpace() {
-        if (!inicializado) return 0;
+        //calcular a quantidade de blocos livres disponíveis no disco
+        if (!inicializado) {
+            return 0;
+        }
 
         int blocosLivres = 0;
 
@@ -296,17 +340,25 @@ public class Fat32 implements FileSystem {
     public List<String> listarArquivos() throws IOException {
         if (!inicializado) throw new IOException("Sistema não inicializado");
 
+        //crio um array com os arquivos do diretorio
         List<String> arquivos = new ArrayList<>();
 
 
+
+        //le o diretorio. Posição 0
         byte[] blocoDir = disco.read(DIRETORIO_BLOCO);
 
 
+        //percorre todas as entradas do diretorio
         for (int i = 0; i < NUMERO_MAXIMO_ENTRADAS; i++) {
+
+            //desloca para a entrada de cada arquivo no diretorio. Primeiro bloco de cada arquivo
             int offset = i * TAM_ENTRADA_DIRETORIO;
 
 
+            //se for !=0 significa que a entrada está ocupada
             if (blocoDir[offset] != 0) {
+                // // Extrai nome e extensão, adiciona na lista
                 String nome = new String(blocoDir, offset, 8).trim();
                 String extensao = new String(blocoDir, offset + 8, 3).trim();
                 arquivos.add(nome + (extensao.isEmpty() ? "" : "." + extensao));
@@ -330,11 +382,17 @@ public class Fat32 implements FileSystem {
     private String formatarNomeArquivo(String nome) {
 
         nome = nome.trim().toUpperCase();
+
+        //separo o  arquivo em nome e extensão. "\\" pq ponto é caratectere especial. Assim ele sabe que é para separar pelo ponto
         String[] partes = nome.split("\\.");
+
+
+        //o nome, posição 0 no array que foi separado. Uso um regex para permitir caracteres de A-Z e de 0 - 9 e substituir tudo que nao for isso por nada. Corto esse caractere
         String nomeBase = partes[0].replaceAll("[^A-Z0-9]", "");
         String extensao = partes.length > 1 ? partes[1].replaceAll("[^A-Z0-9]", "") : "";
 
 
+        //8 caracteres de nome e 3 de extensão
         nomeBase = nomeBase.length() > 8 ? nomeBase.substring(0, 8) : nomeBase;
         extensao = extensao.length() > 3 ? extensao.substring(0, 3) : extensao;
 
@@ -351,15 +409,18 @@ public class Fat32 implements FileSystem {
 
     private int[] alocarBlocos(int quantidade) throws IOException {
 
+        //quantidade que estou recebendo: os blocos necessarios para gravar um arquivo
 
-
+        //crio um array com a quantidade de blocos que vou precisar ocupar no disco
         int[] blocos = new int[quantidade];
 
         int encontrados = 0;
 
 
+        //percorre a FAT no indice 1 e verifica o bloco está livre (encontrados = 0)
         for (int i = 1; i < fat.length && encontrados < quantidade; i++) {
             if (fat[i] == 0) {
+                //armazena no  int[] blocos o numero no bloco livre
                 blocos[encontrados++] = i;
                 fat[i] = -1;
             }
@@ -370,9 +431,12 @@ public class Fat32 implements FileSystem {
         }
 
 
+        // Percorre o array int[] blocos (blocos livres alocados) e faz com que cada bloco aponte para o próximo na FAT.
         for (int i = 0; i < blocos.length - 1; i++) {
             fat[blocos[i]] = blocos[i + 1];
         }
+
+        //marca o ultimo bloco com -1 (fim da lista FAT)
         fat[blocos[blocos.length - 1]] = -1;
         return blocos;
 
@@ -386,17 +450,25 @@ public class Fat32 implements FileSystem {
 
     private void gravarDados(byte[] data, int[] blocos) throws IOException {
 
+        //recebo um byte de dados (o arquivo a ser gravado) e o array de blocos livres que veem da função alocar blocos
+
+        //array int[] blocos na posição 0
         int offset = 0;
 
         for (int bloco : blocos) {
+            // Calcula quantos bytes ainda faltam para escrever, limitando ao tamanho do bloco
             int bytesParaEscrever = Math.min(TAM_BLOCO, data.length - offset);
 
+            // Cria um array para armazenar os dados do bloco atual
             byte[] blocoDados = new byte[TAM_BLOCO];
 
+            // Copia os bytes do arquivo (data), a partir do offset, para o blocoDados
             System.arraycopy(data, offset, blocoDados, 0, bytesParaEscrever);
 
+            // Escreve o blocoDados no disco, no bloco atual
             disco.write(bloco, blocoDados);
 
+            // Atualiza o offset para a próxima parte dos dados
             offset += bytesParaEscrever;
         }
 
@@ -412,22 +484,35 @@ public class Fat32 implements FileSystem {
     private void gravarFat() throws IOException {
 
 
-
+        // Quantas entradas inteiras (4 bytes cada) cabem em um bloco
         int entradasPorBloco = TAM_BLOCO / 4;
 
+        // Calcula quantos blocos serão necessários para armazenar toda a FAT
+        //4 pq está em bits e precisso em bytes
         int blocosFAT = (NUM_BLOCO * 4 + TAM_BLOCO - 1) / TAM_BLOCO;
 
-
+        // Percorre cada bloco necessário para salvar a FAT no disco
         for (int i = 0; i < blocosFAT; i++) {
+            // a fat é composta por varios blocos. Calcular quantos blocos a FAT vai ter
+            // Cria um array de bytes para armazenar os dados de um bloco da FAT
             byte[] blocoFat = new byte[TAM_BLOCO];
 
+            // Percorre as entradas da FAT que cabem nesse bloco. Por exemplo, bloco 1 aponta para o 2
             for (int j = 0; j < entradasPorBloco; j++) {
+
+                // Calcula o índice da entrada da FAT que corresponde à posição j no bloco i da FAT a ser gravada
+                //J é o indice dentro da FAT. J é a  posição atual, no for, que estou na FAT
                 int indiceFat = i * entradasPorBloco + j;
+
+                //indiceFat entrada atual que está sendo copiada para a memoria
                 if (indiceFat < NUM_BLOCO) {
+                    //Preenche a FAT: copia os valores da FAT para o array, 1 inteiro (4 bytes) por vez
+                    //Converter os valores de inteiros em um array de Bytes
                     System.arraycopy(intToBytes(fat[indiceFat]), 0, blocoFat, j * 4, 4);
                 }
             }
 
+            // Grava o bloco da FAT no disco, começando a partir do bloco 1
             disco.write(1 + i, blocoFat); // Blocos FAT começam no bloco 1
         }
 

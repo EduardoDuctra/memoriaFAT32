@@ -23,27 +23,35 @@ public class Disco {
         raf = new RandomAccessFile(f, "rws");
 
         if(!exists) {
-            // Inicializa um disco vazio
+            //inicializa um disco vazio
             raf.setLength(NUM_BLOCO * TAM_BLOCO);
-            // Inicializa FAT e diretório vazios
+            //cria um vetor de bytes com o tamanho do bloco
             byte[] emptyBlock = new byte[TAM_BLOCO];
-            raf.write(emptyBlock);  // Bloco 0 (diretório)
-            raf.write(emptyBlock);  // Bloco 1 (FAT)
+
+            //grava o bloco 0 como Diretório
+            raf.write(emptyBlock);
+            //grava o bloco 1 como a FAT
+            raf.write(emptyBlock);
         }
         return exists;
     }
 
     // Objetivo da função: leitura
-// Faz verificação se o tamanho do numBloco é válido
     public byte[] read(int numBloco) throws IOException {
         if (numBloco < 0 || numBloco >= NUM_BLOCO) {
             throw new IllegalArgumentException("Número de bloco inválido");
         }
 
-        raf.seek(numBloco * TAM_BLOCO); // posiciona o cursor no começo do bloco e depois faz a leitura
-        byte[] read = new byte[TAM_BLOCO];  // Cria um array de bytes com o tamanho de um bloco
+        //Aponta para posição inicial de um arquivo X, para ser percorrido depois
+        raf.seek(numBloco * TAM_BLOCO);
 
-//        O método raf.read(byte[], offset, length) tenta ler até length bytes, mas não é garantido que ele consiga tudo em uma única chamada.
+        //vai criar um array de bytes para salvar os blocos do arquivo a ser percorrido
+        //armazenar o conteudo a ser lido num array do tipo byte
+        byte[] read = new byte[TAM_BLOCO];
+
+        //O método raf.read(byte[], offset, length) tenta ler até length bytes, mas não é garantido que ele consiga tudo em uma única chamada.
+        //talvez precise de vários buffers para ler o arquivo
+
         int totalLido = 0; //quantos bytes foram lidos
         while (totalLido < TAM_BLOCO) { //le todos os bytes do bloco
             int bytesLidos = raf.read(read, totalLido, TAM_BLOCO - totalLido);
@@ -55,9 +63,9 @@ public class Disco {
     }
 
     //Objetivo da função: escrita em um arquivo especifico
-    //    Faz verificação se o tamanho do numBloco é valido
+    // Faz verificação se o tamanho do numBloco é valido
     public void write(int numBloco, byte[] data) throws IOException {
-        if(numBloco >= 0 && numBloco < NUM_BLOCO){ //Verifica se numBloco está dentro do intervalo válido
+        if(numBloco >= 0 && numBloco < NUM_BLOCO){ //Verifica se numBloco está dentro do intervalo válido. Vejo se tem pelo menos um bloco
             if (data != null && data.length <= TAM_BLOCO) { //Verifica se o array data não é null e se o tamanho está dentro do limite (<= TAM_BLOCO
                 this.raf.seek((long) numBloco * TAM_BLOCO); //Usa seek para posicionar no início do bloco correto. Converte para long para evitar estouro de int
                 this.raf.write(data); //Usa write(data) para escrever os dados.
@@ -69,10 +77,4 @@ public class Disco {
         }
     }
 
-    //serve para calcular quantos blocos você precisa para armazenar um arquivo
-    public int calcularBlocosNecessarios(int tamanhoArquivo) {
-        return (tamanhoArquivo + TAM_BLOCO - 1) / TAM_BLOCO;
-        //Arredondar pra cima, garantindo blocos suficientes.
-        // Se tiver qualquer "restinho", ele força o arredondamento pra cima.
-    }
 }

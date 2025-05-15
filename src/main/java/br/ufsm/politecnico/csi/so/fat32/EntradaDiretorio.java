@@ -5,6 +5,7 @@ public class EntradaDiretorio {
     private int fileSize;
     private int starterBlock;
 
+    //cada arquivo tem um nome, tamanho e bloco inicial
     public EntradaDiretorio(String fileName, int fileSize, int starterBlock) {
         this.fileName = fileName;
         this.fileSize = fileSize;
