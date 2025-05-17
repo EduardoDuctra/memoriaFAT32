@@ -13,13 +13,11 @@ public class Main {
             disco.init();
             Fat32 fat32 = new Fat32(disco);
 
+            String caminhoLocal = new File(System.getProperty("user.dir"), "src/main/resources/arquivos/trabalho.pdf").getPath();
+            String caminhoLocal_2 = new File(System.getProperty("user.dir"), "src/main/resources/arquivos/Algoritmos_Prova01.txt").getPath();
 
-            String caminhoLocal = "src/main/resources/arquivos/trabalho.pdf";
-
-            String caminhoLocal_2 = "src/main/resources/arquivos/Algoritmos_Prova01.txt";
-
-            carregarArquivo(fat32,caminhoLocal, "PDFimport");
-            carregarArquivo(fat32,caminhoLocal_2, "TXTimport");
+            carregarArquivo(fat32, caminhoLocal, "PDFimport");
+            carregarArquivo(fat32, caminhoLocal_2, "TXTimport");
 
             menu(fat32);
         } catch (IOException e) {
@@ -46,44 +44,23 @@ public class Main {
             opcao = sc.nextInt();
             sc.nextLine(); // Limpa buffer
 
-            switch(opcao) {
-                case 1:
-                    criarArquivo(fat32, sc);
-                    break;
-                case 2:
-                    listarArquivos(fat32);
-                    break;
-                case 3:
-                    lerArquivo(fat32, sc);
-                    break;
-                case 4:
-                    adicionarConteudo(fat32, sc);
-                    break;
-                case 5:
-                    excluirArquivo(fat32, sc);
-                    break;
-                case 6:
-                    mostrarUsoMemoria(fat32);
-                    break;
-
-                case 7:
-                    exportarArquivo(fat32, sc);
-                    break;
-
-                case 8:
-                    System.out.println("Encerrando sistema...");
-                    break;
-
-                default:
-                    System.out.println("Opção inválida!");
+            switch (opcao) {
+                case 1 -> criarArquivo(fat32, sc);
+                case 2 -> listarArquivos(fat32);
+                case 3 -> lerArquivo(fat32, sc);
+                case 4 -> adicionarConteudo(fat32, sc);
+                case 5 -> excluirArquivo(fat32, sc);
+                case 6 -> mostrarUsoMemoria(fat32);
+                case 7 -> exportarArquivo(fat32, sc);
+                case 8 -> System.out.println("Encerrando sistema...");
+                default -> System.out.println("Opção inválida!");
             }
         } while (opcao != 8);
+
         sc.close();
     }
 
-
     private static void criarArquivo(Fat32 fat32, Scanner sc) throws IOException {
-
         System.out.println("\n--- Criar Arquivo ---");
         System.out.print("Nome do arquivo (max 8 caracteres): ");
         String nome = sc.nextLine();
@@ -95,7 +72,6 @@ public class Main {
         System.out.print("Conteúdo: ");
         String conteudo = sc.nextLine();
 
-        //envio o nome e o conteudo convertido em um array de bytes
         fat32.create(nomeCompleto, conteudo.getBytes());
         System.out.println("Arquivo criado com sucesso!");
     }
@@ -109,9 +85,8 @@ public class Main {
             return;
         }
 
-
         for (int i = 0; i < arquivos.size(); i++) {
-            System.out.println((i+1) + ". " + arquivos.get(i));
+            System.out.println((i + 1) + ". " + arquivos.get(i));
         }
     }
 
@@ -141,11 +116,6 @@ public class Main {
 
         if (indice >= 0) {
             String nomeArquivo = fat32.listarArquivos().get(indice);
-
-            //envia para o método o nome do arquivo a ser lido
-            //cria um array com o conteudo em bytes a ser lido. O método read retorna um array de bytes, que contém os dados do arquivo.
-            // posição do arquivo a ser lido (começa no 0)
-            //-1 indica o fim do arquivo
             byte[] conteudo = fat32.read(nomeArquivo, 0, -1);
             System.out.println("\nConteúdo:\n" + new String(conteudo));
         }
@@ -160,8 +130,6 @@ public class Main {
             System.out.print("Digite o conteúdo a adicionar: ");
             String conteudo = sc.nextLine();
 
-
-            //pega o nome do arquivo, o conteudo passado pela leitura do teclado em bytes para o arquivo que quero salvar
             fat32.append(nomeArquivo, conteudo.getBytes());
             System.out.println("Conteúdo adicionado com sucesso!");
         }
@@ -186,37 +154,27 @@ public class Main {
     }
 
     private static void carregarArquivo(Fat32 fat32, String caminhoLocal, String nomeFAT32) throws IOException {
+        System.out.println("\n--- Carregar Arquivo para FAT32 ---");
 
+        File arquivoLocal = new File(caminhoLocal);
 
-            System.out.println("\n--- Carregar Arquivo para FAT32 ---");
+        if (!arquivoLocal.exists()) {
+            System.out.println("Arquivo não encontrado.");
+            return;
+        }
 
-
-            File arquivoLocal = new File(caminhoLocal);
-
-            if (!arquivoLocal.exists()) {
-                System.out.println("Arquivo não encontrado.");
-                return;
-            }
-
-            try{
-
-            // Lê o conteúdo do arquivo local
+        try {
             byte[] conteudo = Files.readAllBytes(arquivoLocal.toPath());
-
-            // Cria o arquivo no sistema FAT32
             fat32.create(nomeFAT32, conteudo);
-
             System.out.println("Arquivo carregado para o sistema FAT32 com sucesso!");
-
         } catch (IOException e) {
             System.out.println("Caminho inválido ou nome do arquivo já existente");
         }
     }
 
-
     private static void mostrarUsoMemoria(Fat32 fat32) throws IOException {
-        int totalBlocos = Disco.NUM_BLOCO - 2; // desconsidera bloco 0 (diretório) e 1 (FAT)
-        int blocosOcupados = fat32.contarBlocosOcupados(); // método que você irá criar
+        int totalBlocos = Disco.NUM_BLOCO - 2;
+        int blocosOcupados = fat32.contarBlocosOcupados();
         int blocosLivres = totalBlocos - blocosOcupados;
 
         int totalKB = totalBlocos * (Disco.TAM_BLOCO / 1024);
@@ -229,8 +187,6 @@ public class Main {
         System.out.println("Memória Disponível:" + livreKB + " KB");
     }
 
-
-
     private static void exportarArquivo(Fat32 fat32, Scanner sc) throws IOException {
         System.out.println("\n--- Exportar Arquivo ---");
 
@@ -238,13 +194,9 @@ public class Main {
 
         if (indice >= 0) {
             String nomeArquivo = fat32.listarArquivos().get(indice);
-
-            // Lê todo o conteúdo do arquivo
             byte[] conteudo = fat32.read(nomeArquivo, 0, -1);
 
-
-            String caminhoDestino = "E:\\UFSM\\2025_1\\SO\\Trabalho\\fat32\\src\\main\\resources\\arquivos\\pdfExport.pdf";
-
+            String caminhoDestino = new File(System.getProperty("user.dir"), "src/main/resources/arquivos/pdfExport.pdf").getPath();
             File destino = new File(caminhoDestino);
 
             try {
